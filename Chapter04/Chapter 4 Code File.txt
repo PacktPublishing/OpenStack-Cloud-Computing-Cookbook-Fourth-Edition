@@ -1,0 +1,114 @@
+== Chapter 4 Code File ==
+
+## Creating Provider Networks
+
+openstack network create COOKBOOK_PROVIDER_NET \
+--provider-network-type vlan \
+--provider-physical-network vlan \
+--provider-segment 200 
+
+openstack subnet create COOKBOOK_PROVIDER_SUBNET \
+--network COOKBOOK_PROVIDER_NET \
+--subnet-range 192.168.200.0/24
+
+## Creating Tenant Networks
+
+openstack network create COOKBOOK_TENANT_NET_1
+
+openstack subnet create COOKBOOK_TENANT_SUBNET_1 \
+--network COOKBOOK_TENANT_NET_1 \
+--subnet-range 172.16.200.0/24
+
+## Creating Ports
+
+openstack port create COOKBOOK_TEST_PORT_1 \
+--network COOKBOOK_TENANT_NET_1
+
+## Updating Network Attributes
+
+openstack network set COOKBOOK_PROVIDER_NET --external
+
+## Deleting Ports
+
+openstack port delete COOKBOOK_TEST_PORT_1
+
+## Deleting Networks
+
+openstack network delete COOKBOOK_TENANT_NETWORK_3
+
+Note: Network does not exist as part of exercise.
+
+## Creating Routers
+
+openstack router create COOKBOOK_ROUTER_STANDALONE
+
+openstack router create COOKBOOK_ROUTER_HA --ha
+
+openstack router create COOKBOOK_ROUTER_DVR --distributed
+
+## Attach Networks
+
+openstack router set --external-gateway COOKBOOK_PROVIDER_NET COOKBOOK_ROUTER_STANDALONE
+
+openstack router add subnet COOKBOOK_ROUTER_STANDALONE COOKBOOK_TENANT_SUBNET_1
+
+## Create Floating IPs
+
+openstack floating ip create --port COOKBOOK_TEST_PORT_2 COOKBOOK_PROVIDER_NET
+
+## Deleting Routers
+
+openstack router delete COOKBOOK_ROUTER_DVR
+
+## Creating Security Groups
+
+openstack security group create COOKBOOK_SG_WEB 
+
+openstack security group rule create COOKBOOK_SG_WEB \
+--dst-port 80 \
+--protocol tcp \
+--ingress \
+--remote-ip 0.0.0.0/0
+
+## Testing
+
+openstack server create COOKBOOK_INSTANCE_WEB \
+--flavor COOKBOOK_FLAVOR_TINY \
+--image COOKBOOK_IMAGE_CIRROS \
+--nic net-id=COOKBOOK_TENANT_NET_1 \
+--security-group COOKBOOK_SG_WEB
+
+openstack port create COOKBOOK_TEST_PORT_3 \
+--network COOKBOOK_TENANT_NET_1 \
+--security-group COOKBOOK_SG_WEB
+
+openstack port set COOKBOOK_TEST_PORT_2 \
+--security-group COOKBOOK_SG_WEB
+
+## Load Balancers
+
+neutron lbaas-loadbalancer-create COOKBOOK_TENANT_SUBNET_1 \
+--name COOKBOOK_LOADBALANCER_1
+
+neutron lbaas-pool-create --lb-algorithm ROUND_ROBIN \
+--protocol HTTP \
+--loadbalancer COOKBOOK_LOADBALANCER_1 \
+--name COOKBOOK_POOL_1 
+
+neutron lbaas-member-create --name COOKBOOK_MEMBER_1 \
+--subnet COOKBOOK_TENANT_SUBNET_1 \
+--address 172.16.200.11 \
+--protocol-port 80 \
+COOKBOOK_POOL_1 
+
+neutron lbaas-listener-create --name COOKBOOK_LISTENER_1 \
+--loadbalancer COOKBOOK_LOADBALANCER_1 \
+--protocol HTTP \
+--protocol-port 80 \
+--default-pool COOKBOOK_POOL_1 
+
+ip netns exec qlbaas-aa599cee-b49f-44f1-a0fd-51fa69ebf6db \
+curl http://172.16.200.14:80
+
+
+

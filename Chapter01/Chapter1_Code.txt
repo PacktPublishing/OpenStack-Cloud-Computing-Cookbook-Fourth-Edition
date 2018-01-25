@@ -1,0 +1,89 @@
+Chapter 1
+
+## Host network configuration ##
+
+apt update
+apt install vlan bridge-utils
+
+
+#################################
+# File /etc/network/interfaces: #
+#################################
+
+# p2p1 + p4p1 = bond0 (used for host, container and storage)auto p2p1iface p2p1 inet manual  bond-master bond0  bond-primary p2p1  auto p4p1iface p4p1 inet manual  bond-master bond0
+# p2p2 + p4p2 = bond1 (used for Neutron and Storage Replication)auto p2p2iface p2p2 inet manual  bond-master bond1  bond-primary p2p2auto p4p2  iface p4p2 inet manual  bond-master bond1
+
+# We're using bond0 on a native VLAN for the 'host' network.# This bonded interface is likely to replace the address you# are currently using to connect to this host.auto bond0iface bond0 inet static  address 192.168.100.11  netmask 255.255.255.0  gateway 192.168.100.1  dns-nameserver 192.168.100.1 # Update to suitauto bond0.236  # Container VLANiface bond0.236  inet manualauto bond1.240  # VXLAN Tunnel VLANiface bond1.240  inet manualauto bond0.244  # Storage (Instance to Storage) VLANiface bond0.244  inet manual
+
+# Container bridge (br-mgmt)auto br-mgmtiface br-mgmt inet static  address 172.29.236.11  netmask 255.255.255.0  bridge_ports bond0.236  bridge_stp off
+# Neutron's VXLAN bridge (br-vxlan)auto br-vxlaniface br-vxlan inet static  address 172.29.240.11  netmask 255.255.255.0  bridge_ports bond1.240  bridge_stp off# Neutron's VLAN bridge (br-vlan)auto br-vlaniface br-vlan inet manual  bridge_ports bond1  bridge_stp off# Storage Bridge (br-storage)auto br-storage
+iface br-storage inet static  address 172.29.244.11  netmask 255.255.255.0  bridge_ports bond0.244  bridge_stp off# END FILE ##
+
+restart networking
+
+reboot
+apt install fpingfping -a -g 172.29.236.0/24fping -a -g 172.29.240.0/24fping -a -g 172.29.244.0/24
+
+
+## Root SSH keys configuration
+ssh-keygen -t rsa -f ~/.ssh/id_rsa -N ""
+ssh-copy-id root@infra02
+# Repeat
+ssh-copy-id root@infra01
+
+
+## Installation of Ansible, playbooks and dependencies
+apt updateapt install git python-dev bridge-tools lsof lvm2 tcpdump build-essential ntp ntpdate python-dev libyaml-dev libpython2.7-dev libffi-dev libssl-dev python-crypto python-yaml
+
+cd /opt/openstack-ansiblescripts/bootstrap-ansible.sh
+
+
+## Configuring the installation
+git clone -b 16.05 https://github.com/openstack/openstack-ansible.git /opt/openstack-ansible
+cd /opt/openstack-ansiblecp -R /etc/openstack_deploy /etc
+cp /etc/openstack_deploy/openstack_user_variables.yml.example /etc/openstack_deploy_openstack_user_variables.ymlvi /etc/openstack_deploy/openstack_user_variables.yml
+# See here for example: https://raw.githubusercontent.com/OpenStackCookbook/vagrant-openstack/master/openstack_user_config.yml
+
+cd /opt/openstack-ansible/scriptspython pw-token-gen.py --file /etc/openstack_deploy/user_secrets.yml
+
+cd /etc/openstack_deployvi user_variables.yml
+# See here for example: https://raw.githubusercontent.com/OpenStackCookbook/vagrant-openstack/master/user_variables.yml
+
+## Running the OpenStack-Ansible playbooks
+cd /opt/openstack-ansible/playbooks
+openstack-ansible setup-hosts.yml --syntax-checkopenstack-ansible setup-infrastructure.yml --syntax-checkopenstack-ansible setup-openstack.yml --syntax-check
+
+openstack-ansible setup-hosts.yml# (Optional) openstack-ansible install-haproxy.yml
+openstack-ansible setup-infrastructure.yml
+
+openstack-ansible setup-openstack.yml## Troubleshooting the installation
+cd /opt/openstack-ansible/playbooks
+ansible-openstack setup-openstack.yml --retry /root/setup-openstack.retry
+rm -f /etc/openstack_deploy/openstack_inventory.jsonrm -f /etc/openstack_deploy/openstack_hostnames_ips.yml
+cd /opt/openstack-ansible/playbooksopenstack-ansible setup-hosts.ymlcd /opt/openstack-ansible/playbooksopenstack-ansible lxc-containers-destroy.yml
+ansible hosts -m shell -a "pip uninstall -y appdirs"
+rm -f /etc/openstack_deploy/openstack_inventory.json /etc/openstack_deploy/openstack_hostnames_ips.yml## Modifying the OpenStack installation
+# vi /etc/openstack_deploy/user_variables.yml
+# nova_cpu_allocation_ratio: 8.0
+cd /opt/openstack-ansible/playbooksopenstack-ansible os-nova-install.yml --tags 'nova-config'
+
+## Virtual lab - vagrant up!
+
+# Prep tools
+wget -q https://www.virtualbox.org/download/oracle_vbox_2016.asc -O- | sudo apt-key add –vi /etc/apt/sources.list.d/virtualbox.conf
+
+## File: /etc/apt/sources.list.d/virtualbox.conf:
+deb http://download.virtualbox.org/virtualbox/debian xenial contrib
+
+apt update
+apt install virtualbox-5.1
+
+wget https://releases.hashicorp.com/vagrant/2.0.1/vagrant_2.0.1_x86_64.deb
+dpkg -i ./vagrant_2.0.1_x86_64.deb
+vagrant plugin install vagrant-hostmanagervagrant plugin install vagrant-triggers
+
+# Run Vagrant Lab
+git clone https://github.com/OpenStackCookbook/vagrant-openstack
+cd vagrant-openstack
+vagrant up
+

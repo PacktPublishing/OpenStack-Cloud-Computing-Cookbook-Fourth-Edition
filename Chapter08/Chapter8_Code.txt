@@ -1,0 +1,60 @@
+Chapter 8
+
+## Creating Object Containers
+openstack container create books
+openstack container list
+openstack container set books --property title=cookbooks
+openstack container show books
+openstack container create books/chapter1
+openstack container show books/chapter1
+
+
+## Deleting Object Containers
+openstack container list
+openstack container show books
+openstack container delete books
+
+
+## Uploading Objects
+openstack object create books intro.txt
+openstack object list books
+openstack object create books/chapter1 swift.txt
+openstack object list books
+openstack object list books --prefix chapter1/
+openstack object list books --delimiter /
+openstack object show books chapter1/swift.txt
+
+
+## Uploading Large Objects
+swift list
+swift upload -S 25000 books nova.txt 
+swift list books
+swift list books_segments
+swift stat books nova.txt
+
+
+## Downloading Objects
+openstack object list books
+openstack object save books intro.txt
+openstack object save books nova.txt --file /tmp/nova.txt
+
+
+## Deleting Objects
+openstack object list books
+openstack object delete books intro.txt
+openstack object list books
+openstack container delete -r books
+
+
+## Container ACLs
+swift stat books
+swift post books --read-acl ".r:*,.rlistings"
+swift post books --write-acl "*:*"
+swift post -r "" books
+swift post -w "" books
+swift post -r "admin:*" books
+swift stat -v books
+# As admin in admin project:
+swift --os-storage-url http://172.29.236.100:8080/v1/AUTH_402e8fe/books list
+
+

@@ -1,0 +1,151 @@
+Chapter 2
+
+## Installing the OpenStack clients
+
+# Prep / need pip installing
+sudo -i
+wget  https://bootstrap.pypa.io/get-pip.py
+python get-pip.py
+
+# Main
+pip install python-openstackclient
+pip install python-novaclientpip install python-neutronclientpip install python-glanceclientpip install python-heatclientpip install python-keystoneclientpip install python-cinderclientpip install python-swiftclient
+
+# Alternative - prebuilt VM
+git clone https://github.com/OpenStackCookbook/openstack-client.git
+cd openstack-clientvagrant up
+vagrant ssh
+
+
+## Configuring your Linux or MacOS
+# openrc file:
+
+export OS_USERNAME=admin
+export OS_PASSWORD=secreteexport OS_TENANT_NAME=adminexport OS_AUTH_URL=http://192.168.100.117:5000/v3export OS_NO_CACHE=1export OS_USER_DOMAIN_NAME=Defaultexport OS_PROJECT_DOMAIN_NAME=Defaultexport OS_IDENTITY_API_VERSION=3export OS_AUTH_VERSION=3
+
+source openrc
+
+## Configuring your Windows environment
+# PowerShell
+mkdir OpenStackcd OpenStackwget https://raw.githubusercontent.com/OpenStackCookbook/vagrant-openstack/master/Source-OpenRC.ps1 -UseBasicParsing -OutFile Source-OpenRC.ps1
+
+.\Source-OpenRC.ps1 .\openrc
+
+
+## Common OpenStack networking tasks
+
+# Tenant Network
+openstack network create NETWORK_NAME
+openstack subnet create SUBNET_NAME --network NETWORK_NAME --subnet-range CIDR
+
+# Floating
+openstack network create --share —project admin --external --default --provider-network-type flat --provider-physical-network flat GATEWAY_NET
+openstack subnet create --project admin -—subnet-range 192.168.100.0/24 --dhcp --gateway 192.168.100.1 --allocation-pool start=192.168.100.200,end=192.168.100.250 --network GATEWAY_NET GATEWAY_SUBNET
+
+# Security Group
+openstack security group create --project development webserver
+
+# Add rule
+openstack security group rule create --remote-ip 0.0.0.0/0 --dst-port 80:80 --protocol tcp --ingress --project development webserver
+
+# Create router
+openstack router add myRouter
+
+# Add subnet to router
+openstack router add subnet myRouter private-subnet
+
+# Set GW on router
+openstack router set myRouter --external-gateway GATEWAY_NET
+
+
+## Common OpenStack server (instances) tasks
+
+
+# Launch instance
+openstack image list
+openstack network list
+openstack flavor list
+openstack security group list
+openstack keypair list
+
+openstack server create --image IMAGE -—flavor FLAVOR --security-group SECGROUP --nic net-id=NETWORK_UUID --key-name KEYPAIR_NAME INSTANCE_NAME
+
+openstack server list
+
+# Instance snapshot
+openstack server image create --name snapshotRunningWebserver1 myRunningWebserver1
+
+# Resize
+openstack server resize --flavor m1.small myWebserver1
+openstack server list
+openstack server resize --confirm myWebserver1
+
+# Create flavor
+openstack flavor create --ram 512 --disk 0 --vcpus 1 --public m1.tiny
+
+
+## Common OpenStack image tasks
+openstack image create --container-type bare --disk-format qcow2 --public --file /path/to/cirros-0.3.5-x86_64-disk.img
+
+openstack image save --file myImage.qcow2 myImage
+
+# Sharing images
+openstack project list
+openstack image set cirros-image –-shared
+openstack image add project anotherProject
+# f657… uuid of image
+openstack image set --accept f6578a80-5f6f-4f2d-9a8a-9d84cec8a60d
+openstack image list
+
+
+## Common OpenStack identity tasks
+
+# Create project
+openstack project create development
+
+# Create user
+openstack user create --domain default --password password123 --enable developer
+
+# Add user to project
+openstack role add --project development --user developer _member_
+
+# Admin change user’s password
+openstack user set --password cookbook4 developer
+
+# Change own password
+openstack user password set --password cookbook4
+
+
+## Common OpenStack storage tasks
+
+# Create new volume
+openstack volume create --size 5 my5GVolume
+
+# Attach volume
+openstack server add volume my5GVolume 58ea640b-16ba-447c-85db-952174d70f7c# Create volume snapshot
+openstack snapshot create --name myVolumeSnapshot myVolume
+
+# List stats
+openstack object store account show
+
+# Listing Object Storage containers and contents
+openstack object store listopenstack object store list myContainer# Creating and uploading files to object storage
+openstack object create myContainer
+openstack object create myContainer myFile
+
+# Downloading
+openstack object save myContainer myFile
+openstack object save myContainer## Common OpenStack orchestration tasks
+
+# Launch Stack
+openstack stack create --template myStack.yml --environment myStack-Env.yml myStack
+
+# List stacks
+openstack stack list
+
+# Delete a stack
+openstack stack delete myStack# List resources in a stack
+openstack stack resource show myResource
+
+# View the outputs of a running stack
+openstack stack output listopenstack stack output show myOutput

@@ -1,0 +1,88 @@
+Chapter 9 
+
+## Creating your first stack
+
+# Dowload HOT
+wget -O cookbook.yaml https://raw.githubusercontent.com/OpenStackCookbook/OpenStackCookbook/master/cookbook.yaml
+
+openstack keypair listopenstack image listopenstack flavor listopenstack network list
+
+vi cookbook-env.yml
+
+## File cookbook-env.yml
+
+parameters:    key_name: demokey    image: xenial-image    flavor: m1.tiny    public_net_id: 2da8979e-dcf8-4eb8-b207-f33bfce4a15a    private_net_id: 78a5a119-c27a-41c4-8310-5c04d3a6bc31    private_subnet_id: 3cee2bb9-5673-4a6e-bb1e-8cb66be066b2
+
+
+## End
+
+## Launch Stack with Heat
+openstack stack create myStack --template cookbook.yaml --environment cookbook-env.yaml
+openstack stack list
+
+## View resources of stack
+openstack stack show myStack
+
+openstack stack output list myStack
+
+openstack stack output show myStack haproxy_public_ip
+
+## Delete stack
+openstack stack delete myStack
+
+
+## Updating the stack
+vi cookbook-env.yml
+
+## File cookbook-env.yml
+parameters:    key_name: demokey    image: xenial-image    flavor: m1.large    public_net_id: 2da8979e-dcf8-4eb8-b207-f33bfce4a15a    private_net_id: 78a5a119-c27a-41c4-8310-5c04d3a6bc31    private_subnet_id: 3cee2bb9-5673-4a6e-bb1e-8cb66be066b2
+
+## End
+
+openstack stack show myStackopenstack stack update myStack --existing
+openstack stack show myStack## Installing and configuring Ansible for OpenStack
+sudo pip install shade
+
+# Ubuntu
+sudo apt-get install software-properties-common
+sudo apt-add-repository ppa:ansible/ansible
+sudo apt-get updatesudo apt-get install ansible
+
+# Mac/PIP
+sudo easy_install pip
+sudo pip install ansible
+
+ansible —version
+
+
+## Using Ansible to launch instances
+
+## File: launch-instance.yml:
+
+name: Launch instance on OpenStack         hosts: localhost         gather_facts: false         tasks:         - name: Deploy an instance           os_server:              state: present              name: cookbook1              image: xenial-image
+              key_name: demokey              timeout: 200              flavor: m1.tiny              network: private-net              verify: false
+
+## End file
+
+source openrc
+ansible-playbook launch-instance.yml
+openstack server list
+
+
+## Using Ansible to orchestrate software install
+wget https://raw.githubusercontent.com/OpenStackCookbook/vagrant-openstack/master/orchestrate-instance.yml
+source openrc
+ansible-playbook orchestrate-instance.yml## Using Ansible to orchestrate software installations across multiple instances
+wget https://raw.githubusercontent.com/OpenStackCookbook/vagrant-openstack/master/multi-orchestrate-instances.yml
+source openrc
+ansible-playbook multi-orchestrate-instances.yml
+
+
+## Using Ansible to fully orchestrate the creation of a web server and load balancer stack
+wget https://raw.githubusercontent.com/OpenStackCookbook/vagrant-openstack/master/full-stack.yml
+mkdir -p templates
+wget -O templates/haproxy.cfg.j2 https://raw.githubusercontent.com/OpenStackCookbook/vagrant-openstack/master/templates/haproxy.cfg.j2
+mkdir -p group_vars/haproxy
+wget -O group_vars/haproxy/main.yml https://raw.githubusercontent.com/OpenStackCookbook/vagrant-openstack/master/group_vars/haproxy/main.yml
+source openrc
+ansible-playbook full-stack.yml

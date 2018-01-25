@@ -1,0 +1,225 @@
+== Chapter 6 Code File ==
+
+## Downloading and Creating an Image
+
+wget https://download.cirros-cloud.net/0.3.5/cirros-0.3.5-i386-disk.img -O /tmp/cirros-0.3.5-i386-disk.img
+
+openstack image create COOKBOOK_CIRROS_IMAGE \
+--disk-format qcow2 \	
+--file /tmp/cirros-0.3.5-i386-disk.img
+
+wget https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img -O /tmp/xenial-server-cloudimg-amd64-disk1.img
+
+openstack image create COOKBOOK_UBUNTU_IMAGE \
+--disk-format qcow2 \
+--file /tmp/xenial-server-cloudimg-amd64-disk1.img
+
+## Listing Images
+
+openstack image list
+
+## Deleting Images
+
+openstack image delete COOKBOOK_CIRROS_IMAGE
+
+## Download Images
+
+openstack image save COOKBOOK_UBUNTU_IMAGE \
+--file /tmp/my_downloaded_ubuntu_image.qcow2
+
+## Sharing Images
+
+source finance_openrc
+openstack image list
+source openrc
+openstack image set COOKBOOK_UBUNTU_IMAGE --shared
+openstack image add project COOKBOOK_UBUNTU_IMAGE FINANCE
+source finance_openrc
+openstack image set d120a923-5246-4dca-8f52-51a951bffce5 --accept
+openstack image list
+
+## Creating Snapshots
+
+openstack server image create \
+--name COOKBOOK_TEST_SNAPSHOT_20171016 \
+COOKBOOK_TEST_INSTANCE
+
+## Setting Metadata
+
+openstack image set COOKBOOK_UBUNTU_IMAGE \
+--property architecture=m68k \
+--property os_distro=ubuntu
+
+openstack image unset COOKBOOK_UBUNTU_IMAGE \
+--property architecture
+
+## Protecting Images
+
+openstack image set COOKBOOK_UBUNTU_IMAGE --protected
+openstack image set COOKBOOK_UBUNTU_IMAGE --unprotected
+
+## Activating Images
+
+openstack image set COOKBOOK_UBUNTU_IMAGE --deactivate
+openstack image set COOKBOOK_UBUNTU_IMAGE --activate
+
+## Creating Custom Images
+
+sudo apt update
+sudo apt install qemu-kvm libvirt-bin virt-manager
+
+cd ~/ 
+
+install
+text
+url --url http://mirror.rackspace.com/CentOS/7/os/x86_64/
+lang en_US.UTF-8
+keyboard us
+network --onboot yes --bootproto dhcp --noipv6
+timezone --utc America/Chicago
+zerombr
+clearpart --all --initlabel
+bootloader --location=mbr --append="crashkernel=auto"
+part / --fstype=ext4 --size=1024 --grow
+authconfig --enableshadow --passalgo=sha512
+rootpw openstack
+firewall --disable
+selinux --disabled
+skipx
+shutdown
+%packages
+@core
+openssh-server
+openssh-clients
+wget
+curl
+git
+man
+vim
+ntp
+%end
+%post
+%end
+
+sudo qemu-img create -f qcow2 \
+/var/lib/libvirt/images/centos-7.qcow2 10G
+
+sudo virt-install --virt-type qemu \
+--name centos-7 \
+--ram 2048 \
+--location="http://mirror.rackspace.com/CentOS/7/os/x86_64/" \
+--disk /var/lib/libvirt/images/centos-7.qcow2,format=qcow2 \
+--network network=default \
+--graphics vnc,listen=0.0.0.0 \
+--noautoconsole \
+--os-type=linux \
+--os-variant=centos7.0 \
+--initrd-inject ks.cfg \
+--rng /dev/random \
+--extra-args="inst.ks=file:/ks.cfg console=ttyS0,115200"
+
+virsh console centos-7
+
+sudo virsh start centos-7
+virsh console centos-7
+
+yum -y install epel-release
+yum -y install cloud-init cloud-utils cloud-utils-growpart
+
+# Begin Cloud-Init
+users:
+- default
+
+disable_root: 1
+ssh_pwauth:   0
+
+locale_configfile: /etc/sysconfig/i18n
+mount_default_fields: [~, ~, 'auto', 'defaults,nofail', '0', '2']
+resize_rootfs_tmp: /dev
+ssh_deletekeys:   0
+
+ssh_genkeytypes:  ~
+syslog_fix_perms: ~
+
+cloud_init_modules:
+- bootcmd
+- write-files
+- resizefs
+- set_hostname
+- update_hostname
+- update_etc_hosts
+- rsyslog
+- users-groups
+- ssh
+
+cloud_config_modules:
+- mounts
+- locale
+- set-passwords
+- timezone
+- puppet
+- chef
+- salt-minion
+- mcollective
+- disable-ec2-metadata
+- runcmd
+
+cloud_final_modules:
+- rightscale_userdata
+- scripts-per-once
+- scripts-per-boot
+- scripts-per-instance
+- scripts-user
+- ssh-authkey-fingerprints
+- keys-to-console
+- phone-home
+- final-message
+
+system_info:
+ distro: rhel
+ default_user:
+   name: centos
+   lock_passwd: True
+   shell: /bin/bash
+   sudo: ["ALL=(ALL) NOPASSWD: ALL"]
+ paths:
+   cloud_dir: /var/lib/cloud
+   templates_dir: /etc/cloud/templates
+ ssh_svcname: sshd
+# End Cloud-Init
+
+echo "NOZEROCONF=yes" >> /etc/sysconfig/network
+
+rm -rf /etc/udev/rules.d/70-persistent-net.rules
+
+sed -i '/HWADDR/d' /etc/sysconfig/network-scripts/ifcfg-eth0
+sed -i '/UUID/d' /etc/sysconfig/network-scripts/ifcfg-eth0
+
+NAME="eth0"
+ONBOOT="yes"
+NETBOOT="yes"
+IPV6INIT="no"
+BOOTPROTO="dhcp"
+TYPE="Ethernet"
+DEFROUTE="yes"
+PEERDNS="yes"
+PEERROUTES="yes"
+IPV4_FAILURE_FATAL="no"
+
+yum clean all
+rm -rf /var/log/*
+rm -rf /tmp/*
+history -c
+
+shutdown -h now
+
+openstack image create MY_CENTOS_IMAGE \
+--disk-format qcow2 \
+--file ~/centos-7.qcow2
+
+
+
+
+
+
+

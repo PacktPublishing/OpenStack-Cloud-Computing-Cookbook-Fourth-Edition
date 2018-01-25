@@ -1,0 +1,190 @@
+Chapter 5
+
+## Adding compute host
+
+## File: /etc/openstack_deploy/openstack_user_config.yml
+
+compute-01
+  ip: 172.29.236.13
+compute-02:
+  ip: 172.29.236.14
+compute-03:
+  ip: 172.29 236.15
+
+## End
+
+cd /opt/openstack-ansible/playbooks
+openstack-ansible setup-hosts.yml --limit compute-03
+
+ansible nova_all -m setup -a 'filter=ansible_local gather_subset="!all"'
+openstack-ansible os-nova-install.yml --limit compute-03
+
+lxc-attach --name $(lxc-ls -1 | grep utility)
+source openrc
+openstack hypervisor list
+
+
+## Suspend host
+source ~/openrc
+
+openstack compute service list -c Binary -c Host -c Status -f table
+openstack compute service set --disable compute-03 nova-compute
+openstack compute service list -c Binary -c Host -c Status -f table
+nova host-evacuate-live --block-migrate compute-03
+
+
+## Configuring Nova scheduler for host aggregates
+
+## File: /etc/openstack_deploy/user_variables.yml:
+
+nova_scheduler_default_filters: "AggregateInstanceExtraSpecsFilter,RetryFilter,AvailabilityZoneFilter,RamFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,AggregateCoreFilter,AggregateDiskFilter"
+
+## End
+
+cd /opt/openstack-ansible/playbooks
+openstack-ansible os-nova-install.yml
+
+lxc-attach --name controller-01_nova_scheduler_container-ed0f657d
+
+grep Aggregate /etc/nova/nova.conf
+
+
+## Create host aggregate
+
+openstack aggregate list
+openstack aggregate create cookbook-ssd-hosts
+openstack aggregate list
+
+
+## Add compute host to aggregate
+openstack aggregate show cookbook-ssd-hosts
+openstack aggregate add host cookbook-ssd-hosts compute-01
+
+
+## Remove compute host from aggregate
+openstack aggregate show cookbook-ssd-hosts
+openstack aggregate remove host cookbook-ssd-hosts compute-01
+
+
+## Adding metadata to host aggregate
+openstack aggregate show cookbook-ssd-hosts
+openstack aggregate set --property ssd=true cookbook-ssd-hosts
+openstack flavor create --vcpus 1 --ram 512 --disk 5 --public cookbook.ssd
+nova flavor-key cookbook.ssd set ssd=true
+openstack flavor list
+
+
+## Delete a host aggregate
+openstack aggregate list
+openstack aggregate show cookbook-threadripper-hosts
+openstack aggregate delete cookbook-threadripper-hosts
+openstack aggregate list
+
+
+## Create AZ
+openstack availability zone list
+openstack aggregate create --zone cookbook-az cookbook-az
+openstack aggregate add host cookbook-az compute-01
+openstack availability zone list
+
+
+## Boot instance into AZ
+openstack server create --flavor openstack.cookbook --image 08b822ba-be44-4639-b577-45e8dd37c06d --nic net-id=6cb5a4ce-1ea5-4817-9c34-a2212a66f394 --security-group bd7d5e0f-538a-4d93-b123-98cc3207b3d2 --key-name cookbook_key --availability-zone cookbook-az cookbook.test-03
+
+
+## Remove an AZ
+openstack availability zone list
+openstack aggregate show cookbook-az
+openstack aggregate remove host cookbook-az compute-01
+openstack aggregate delete cookbook-az
+openstack availability zone list
+
+
+## Create a flavor
+openstack flavor list
+openstack flavor create --vcpus 1 --ram 512 --disk 5 --public openstack.cookbook
+openstack flavor list
+
+
+## Delete a flavor
+openstack flavor list
+openstack flavor delete openstack.cookbook
+openstack flavor list
+
+
+## Set CPU limits for a flavor
+openstack flavor show openstack.cookbook
+openstack flavor set --property quota:cpu_quota=5000 --property quota:cpu_period=2500 openstack.cookbook
+openstack flavor show openstack.cookbook
+
+
+## IOPS limits for a flavor
+openstack flavor show openstack.cookbook
+openstack flavor set --property quota:disk_read_iops=100 --property quota:disk_write_iops=100 openstack.cookbook
+openstack flavor show openstack.cookbook
+
+
+## Booting an instance
+openstack server list
+openstack network list
+#(if required) ssh-keygen -q -N ""
+openstack keypair create --public-key ~/.ssh/id_rsa.pub cookbook_key
+openstack server create --flavor openstack.cookbook --image 08b822ba-be44-4639-b577-45e8dd37c06d --nic net-id=6cb5a4ce-1ea5-4817-9c34-a2212a66f394 --security-group ssh --key-name cookbook_key cookbook.test
+openstack server show cookbook.test
+
+
+## Stopping an instance
+openstack server list
+openstack server stop cookbook.test
+openstack server list
+
+
+## Deleting an instance
+openstack server list
+openstack server delete cookbook.test
+openstack server list
+
+
+## Live migration
+openstack hypervisor list
+openstack server show cookbook.test -c name -c OS-EXT-SRV-ATTR:hypervisor_hostname
+# Block
+openstack server migrate --block-migration cookbook.test
+# or Live
+openstack server migrate cookbook.test --live compute-02.cook.book
+openstack server show -c name -c OS-EXT-STS:task_state cookbook.test
+
+
+## Snapshotting an instance
+openstack image list -c Name -c Status
+openstack server list -c Name -c Status
+openstack server image create --name cookbook.test_snapshot-$(date +"%FT%H%M%S") cookbook.test
+openstack image list
+
+
+## Booting an instance from a snapshot
+openstack server list -c Name -c Status
+openstack server create --flavor openstack.cookbook --image cookbook.test_snapshot-2017-09-08T163619 --nic net-id=6cb5a4ce-1ea5-4817-9c34-a2212a66f394 --security-group bd7d5e0f-538a-4d93-b123-98cc3207b3d2 --key-name cookbook_key cookbook.test_restore
+
+
+## Rescue an instance
+openstack server rescue cookbook.test
+openstack server show cookbook.test -c name -c status
+openstack server unrescue cookbook.test
+
+
+## Shelving an instance
+openstack server show cookbook.test -c name -c status
+openstack server shelve cookbook.test
+openstack server show cookbook.test -c name -c addresses -c status
+openstack server unshelve cookbook.test
+openstack server show cookbook.test -c name -c addresses -c status
+
+
+## Reviewing console logs
+openstack console log show --lines 5 cookbook.test
+
+
+
+
+

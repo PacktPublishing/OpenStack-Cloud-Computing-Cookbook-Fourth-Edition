@@ -1,0 +1,115 @@
+Chapter 3 
+
+
+
+## Create domain
+openstack domain create --description "Book domain" bookstore
+openstack domain create --description <description> <name>
+
+
+
+## Enabling domains in the OpenStack dashboard
+##
+
+
+ File: /etc/openstack_deploy/user_variables.yml 
+## Insert:
+horizon_keystone_multidomain_support: True
+
+## deploy:
+openstack-ansible /opt/openstack-ansible/playbooks/os-horizon-install.yml
+
+## Creating OpenStack projects in Keystone
+openstack project create --domain bookstore --description "Cookbook Project" cookbook
+openstack project create --domain <domain> --description <description> <name>
+
+## Configuring roles in Keystone
+openstack role create --domain bookstore cloud_admin
+openstack role create user
+openstack role list --domain bookstore
+openstack role list            
+
+openstack role create --domain <domain_name> <role_name>
+
+
+openstack role list --domain <domain_name>
+
+
+
+## Adding users in Keystone
+openstack domain list
+openstack user create --domain bookstore --password verysecret cloud_admin
+openstack project list
+openstack user create --domain bookstore --project cookbook --password verysecret reader
+openstack role add --domain bookstore --user cloud_admin --role-domain bookstore admin
+openstack role add --project cookbook --user reader _member_
+openstack role assignment list
+openstack user create --domain <domain> --password <password> <user_name>
+openstack role add --project <project> --user <user> <role>
+openstack role add --domain <domain> --user <user> --role-domain <role_domain> <role>
+openstack project list
+openstack user list
+openstack role list
+openstack domain list 
+openstack role assignment list
+
+## Configuring groups in Keystone
+openstack group create --domain bookstore --description "Bookstore reader group" reader_group
+openstack group list
+openstack role add --group reader_group --domain bookstore --role-domain bookstore cloud_admin
+openstack group add user --group-domain bookstore --user-domain bookstore reader_group reader 
+openstack group add user --group-domain bookstore --user-domain bookstore reader_group reader1 
+openstack group contains user reader_group reader
+openstack group contains user readergroup reader1
+openstack group remove user reader_group reader1
+openstack group contains user reader_group reader1
+openstack group create --domain <domain-name> --description <group-description> <group-name>
+openstack role add --group <group> --domain <domain> --role-domain <role_domain> <role>
+openstack project list
+openstack group list
+openstack role list
+openstack domain list 
+openstack group add user --group-domain <group_dommain> --user-domain <user_domain> <group> <user>
+openstack group remove user <group> <user>
+openstack group contains user <group> <user>
+openstack role assignment list
+
+## Deleting projects
+openstack project list          
+openstack project delete oldbook
+openstack project delete <project>
+
+## Deleting users
+openstack user list
+openstack user delete oldreader
+openstack user list          
+openstack user delete <user>
+
+##Deleting roles
+openstack role list  
+openstack role delete oldrole
+openstack role delete <role>
+
+## Deleting groups
+openstack group list
+openstack group delete oldgroup
+openstack group delete <group>
+
+## Deleting domains
+openstack domain list
+openstack user list --domain olddomain
+openstack domain set --disable  olddomain
+openstack domain delete olddomain
+openstack user list --domain <domain>
+openstack domain set --disable  <domain>
+openstack domain delete <domain>
+
+## OpenStack endpoint information
+openstack catalog list 
+
+
+
+
+
+
+

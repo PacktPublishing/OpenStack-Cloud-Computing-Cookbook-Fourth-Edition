@@ -1,0 +1,132 @@
+Chapter 7
+
+## Configuring Cinder volume services
+
+## File: /etc/openstack_deploy/openstack_user_config.yml:
+
+---
+storage-infra_hosts:
+  controller-01:
+    ip: 172.29.236.10
+
+storage_hosts:
+  cinder-volume:
+    ip: 172.29.236.100
+    container_vars:
+      cinder_backends:
+        limit_container_types: cinder_volume
+        lvm:
+          volume_group: cinder-volumes
+          volume_driver: cinder.volume.drivers.lvm.LVMVolumeDriver
+          volume_backend_name: LVM_iSCSI
+          iscsi_ip_address: "172.29.244.100"
+
+## End
+
+## File: /etc/openstack_deploy/user_variables.yml
+
+## Cinder iscsi
+cinder_iscsi_helper: tgtadm
+cinder_iscsi_iotype: fileio
+cinder_iscsi_num_targets: 100
+cinder_iscsi_port: 3260
+
+
+## End
+
+## File: /etc/openstack_deploy/env.d/cinder.yml:
+
+---
+container_skel:
+  cinder_volumes_container:
+    properties:
+      is_metal: true
+
+## End
+
+# On the target cinder volume host
+pvcreate /dev/sdb
+vgcreate cinder-volumes /dev/sdb
+
+
+# On deployment host
+cd /opt/openstack-ansible/playbooks
+openstack-ansible os-cinder-install.yml
+
+lxc-attach --name $(lxc-ls -1 | grep util)
+source openrc
+cinder service-list
+
+
+## Creating volumes
+openstack volume create --size 10 --description “Cookbook Volume” cookbook.volume
+
+
+## Attaching volumes to an instance
+# on client
+openstack server list -c Name -c ID -f table
+openstack volume list 
+openstack server add volume cookbook.test cookbook.volume --device /dev/vdc
+
+# On VM
+lsblk
+sudo mkfs.ext4 /dev/vdb
+sudo mkdir /mnt1
+sudo mount /dev/vdb /mnt1
+
+
+## Detaching volumes from an instance
+# on client
+openstack server list -c Name -c ID -f table
+openstack volume list
+
+# on VM
+df -h
+sudo umount /mnt1
+
+# On client
+openstack server remove volume cookbook.test cookbook.volume
+openstack volume list 
+
+
+## Deleting volumes
+openstack volume list 
+openstack volume delete cookbook.volume
+
+
+## Working with volume snapshots
+openstack volume list -c Name -c ID -c Status -f table
+openstack volume snapshot create --volume cookbook.volume cookbook.snapshot
+openstack volume snapshot list -c ID -c Name -c Status -f table
+cinder snapshot-reset-state cookbook.snapshot
+openstack volume create --snapshot cookbook.snapshot newcookbook.volume
+openstack volume list –c Name –c ID –c Status –f table
+openstack volume snapshot delete cookbook.snapshot
+
+
+## Configuring volume types
+openstack volume type list
+openstack volume type create --description "The High IOPS volume type is QOS applied to 500 IOPS" "High IOPS"
+openstack volume type list
+openstack volume create --size 10 --type "High IOPS" --description "High IOPS Volume" highiops.volume
+
+
+## Enable volume encryption
+openstack volume type create --description "LUKS Encrypted volumes" --encryption-provider nova.volume.encryptors.luks.LuksEncryptor --encryption-control-location front-end --encryption-key-size 256 --encryption-cipher aes-xts-plain64 "Encrypted"
+openstack volume create --size 1 --type “Encrypted” --description “An encrypted volume” encrypted.volume 
+
+
+## Configure QoS
+openstack volume qos list --print-empty
+openstack volume qos create --consumer both --property maxIOPS=500 "High IOPS"
+openstack volume qos list -c Name -c Consumer -c Properties -f table
+openstack volume qos associate "High IOPS" "High IOPS"
+
+
+## Reset volume status
+openstack volume list -c Name -c Status -f table
+cinder reset-state 23e1e006-a753-403c-ad8f-27e98444f71e --state available
+openstack volume list -c Name -c Status -f table
+
+
+
